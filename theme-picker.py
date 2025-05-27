@@ -2,7 +2,7 @@
 
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["pillow", "pywal", "numpy"]
+# dependencies = ["pillow", "numpy"]
 # ///
 #
 
@@ -198,11 +198,11 @@ def install_theme(names, scores):
         if n.isdigit():
             n = int(n)
             if n in range(len(names)):
-                subprocess.call('wal --theme ' + names[int(n)], shell=True)
+                subprocess.call('wallust theme ' + names[int(n)], shell=True)
             else:
                 print("Number is outside the bounds")
         elif n == 'r':
-            subprocess.call('wal --theme ' + backup_path, shell=True)
+            subprocess.call('wallust theme ' + backup_path, shell=True)
         elif n == 'q':
             return
         else:
