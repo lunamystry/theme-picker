@@ -1,4 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env -S uv run --script
+
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["pillow", "pywal", "numpy"]
+# ///
+#
 
 from argparse import ArgumentParser
 from PIL import Image
