@@ -69,7 +69,7 @@ def compute_image_palette(colors, counts, palette_size, method='k++_pdf'):
 def pick_best_themes(palette, importances, num_results):
     # Load themes
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    dir_path = dir_path + "/themes/"
+    dir_path = dir_path + "/themes/colorschemes/"
     theme_names = [name[:-5] for name in os.listdir(dir_path)]
     themes = []
     for file_name in os.listdir(dir_path):
