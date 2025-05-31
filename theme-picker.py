@@ -2,7 +2,7 @@
 
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["pillow", "numpy"]
+# dependencies = ["pillow", "numpy", "click"]
 # ///
 #
 
@@ -30,7 +30,7 @@ def calculate_importances(populations, colors):
 
 # Loads an image and extracts colors and their frequencies from an image
 def get_image_colors(args):
-    with Image.open(args.image_path).convert('RGB') as im:
+    with Image.open(args.image_path).convert("RGB") as im:
         tally = Counter(im.getdata())
 
     counts = list(tally.values())
@@ -41,15 +41,15 @@ def get_image_colors(args):
 
 # Uses K-means algorithm to find the best fitting palette
 # of palette_size lengths for the image
-def compute_image_palette(colors, counts, palette_size, method='k++_pdf'):
+def compute_image_palette(colors, counts, palette_size, method="k++_pdf"):
     # Repeats search multiple times to find the best fit
     best_palette = None
     best_populations = None
     best_error = 10**15
     for ii in range(MAX_FIT_ITERATIONS):
-        palette, populations, error = wkmean(palette_size, colors,
-                                             weights=counts,
-                                             method=method)
+        palette, populations, error = wkmean(
+            palette_size, colors, weights=counts, method=method
+        )
         if error < best_error:
             best_error = error
             best_palette = palette
@@ -75,16 +75,18 @@ def pick_best_themes(palette, importances, num_results):
     for file_name in os.listdir(dir_path):
         with open(dir_path + file_name) as f:
             data = json.load(f)
-        colors = [data['special']['foreground'],
-                  data['special']['background'],
-                  data['colors']['color0'],
-                  data['colors']['color1'],
-                  data['colors']['color2'],
-                  data['colors']['color3'],
-                  data['colors']['color4'],
-                  data['colors']['color5'],
-                  data['colors']['color6'],
-                  data['colors']['color7']]
+        colors = [
+            data["special"]["foreground"],
+            data["special"]["background"],
+            data["colors"]["color0"],
+            data["colors"]["color1"],
+            data["colors"]["color2"],
+            data["colors"]["color3"],
+            data["colors"]["color4"],
+            data["colors"]["color5"],
+            data["colors"]["color6"],
+            data["colors"]["color7"],
+        ]
         colors = [rgb(color) for color in colors]
         themes.append(colors)
     themes = np.array(themes, dtype=int)
@@ -94,8 +96,7 @@ def pick_best_themes(palette, importances, num_results):
     for theme in themes:
         distances = []
         for palette_color in palette:
-            dist = [rgb_dist(palette_color, theme_color)
-                    for theme_color in theme]
+            dist = [rgb_dist(palette_color, theme_color) for theme_color in theme]
             min_dist = np.min(dist)
             distances.append(min_dist)
         distances = np.array(distances)
@@ -119,15 +120,15 @@ def print_palettes(palette, themes):
     m = max([len(p) for p in palettes])
 
     def colorize(ii, palettes):
-        ind_col = ii // (n*L**2)
-        ind_pal = (ii % (n*L)) // L
+        ind_col = ii // (n * L**2)
+        ind_pal = (ii % (n * L)) // L
         if ind_col < len(palettes[ind_pal]):
             return palettes[ind_pal][ind_col]
         else:
             return [255, 255, 255]
 
-    array = np.array([colorize(ii, palettes) for ii in range(n*m*L*L)])
-    array = np.reshape(array, (m*L, n*L, 3))
+    array = np.array([colorize(ii, palettes) for ii in range(n * m * L * L)])
+    array = np.reshape(array, (m * L, n * L, 3))
     array = array.astype(np.uint8)
     im = Image.fromarray(array)
     im.show()
@@ -135,53 +136,69 @@ def print_palettes(palette, themes):
 
 def parse_args():
     parser = ArgumentParser(
-            description='Tries to pick the best color palette for a given image \
-                    from a set of hand-picked syntax-highlighting palettes.')
-    parser.add_argument('-n', type=int, default=10,
-                        help='number of themes to print')
-    parser.add_argument('-c', type=int, default=10,
-                        help='number of dominating colors in image')
-    parser.add_argument('-p', action='store_true',
-                        help='print image palette (first column) \
-                                and n best themes in feh')
-    parser.add_argument('-i', action='store_true',
-                        help='call interactive menu to install one of the \
-                                suggested themes using wal')
-    parser.add_argument('image_path', metavar='image_path', type=str)
+        description="Tries to pick the best color palette for a given image \
+                    from a set of hand-picked syntax-highlighting palettes."
+    )
+    parser.add_argument("-n", type=int, default=10, help="number of themes to print")
+    parser.add_argument(
+        "-c", type=int, default=10, help="number of dominating colors in image"
+    )
+    parser.add_argument(
+        "-p",
+        action="store_true",
+        help="print image palette (first column) \
+                                and n best themes in feh",
+    )
+    parser.add_argument(
+        "-a",
+        action="store_true",
+        help="Apply the current theme",
+    )
+    parser.add_argument(
+        "-i",
+        action="store_true",
+        help="call interactive menu to install one of the \
+                                suggested themes using wal",
+    )
+    parser.add_argument("image_path", metavar="image_path", type=str)
     args = parser.parse_args()
     return args
 
 
 def print_results(names, scores):
-    print("    Theme", ' ' * 32, "Score (lower is better)")
+    print("    Theme", " " * 32, "Score (lower is better)")
     for ii in range(len(names)):
-        print(str(ii) + ')' + ' ' * (2 - len(str(ii))),
-              names[ii], ' ' * (37 - len(names[ii])), scores[ii])
+        print(
+            str(ii) + ")" + " " * (2 - len(str(ii))),
+            names[ii],
+            " " * (37 - len(names[ii])),
+            scores[ii],
+        )
 
 
 def save_current_theme():
     xrdb = subprocess.check_output("xrdb -query", shell=True)
     data = xrdb.decode()
     data = data.splitlines()
-    data = [line.split(':\t') for line in data]
+    data = [line.split(":\t") for line in data]
     colors = {}
     special = {}
     for key, value in data:
-        if key[1:6] == 'color':
+        if key[1:6] == "color":
             colors[key[1:]] = value
-        elif key[1:11] == 'background':
-            special['background'] = value
-        elif key[1:11] == 'foreground':
-            special['foreground'] = value
-        elif key == 'URxvt*cursorColor':
-            special['cursor'] = value
+        elif key[1:11] == "background":
+            special["background"] = value
+        elif key[1:11] == "foreground":
+            special["foreground"] = value
+        elif key == "URxvt*cursorColor":
+            special["cursor"] = value
     data = {}
-    data['special'] = special
-    data['colors'] = colors
+    data["special"] = special
+    data["colors"] = colors
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    file_path = dir_path + '/revert_theme.json'
-    with open(file_path, 'w') as f:
+    file_path = dir_path + "/revert_theme.json"
+    with open(file_path, "w") as f:
         json.dump(data, f, indent=4)
     return file_path
 
@@ -189,21 +206,30 @@ def save_current_theme():
 def install_theme(names, scores):
     backup_path = save_current_theme()
 
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    themes_path = dir_path + "/themes/colorschemes/"
+    current_theme_path = dir_path + "/current_theme"
+
     while True:
         print("")
         print_results(names, scores)
-        n = input("Enter the theme number to install, "
-                  + "'r' to revert to the initial theme, "
-                  + "or 'q' to exit:\n")
+        n = input(
+            "Enter the theme number to install, "
+            + "'r' to revert to the initial theme, "
+            + "or 'q' to exit:\n"
+        )
         if n.isdigit():
             n = int(n)
             if n in range(len(names)):
-                subprocess.call('wallust theme ' + names[int(n)], shell=True)
+                theme_name = names[int(n)]
+                subprocess.call(f"wallust theme {theme_name}", shell=True)
+                with open(current_theme_path, "w") as file:
+                    file.write(theme_name)
             else:
                 print("Number is outside the bounds")
-        elif n == 'r':
-            subprocess.call('wallust theme ' + backup_path, shell=True)
-        elif n == 'q':
+        elif n == "r":
+            subprocess.call("wallust theme " + backup_path, shell=True)
+        elif n == "q":
             return
         else:
             print("Not a valid command")
@@ -222,8 +248,20 @@ def colors_to_bins(counts, colors, bin_size):
     return np.array(new_counts), np.array(new_colors)
 
 
-if __name__ == '__main__':
+def apply_theme():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    current_theme_path = dir_path + "/current_theme"
+    with open(current_theme_path) as f:
+        theme_name = f.read()
+    subprocess.call(f"wallust theme {theme_name}", shell=True)
+
+
+if __name__ == "__main__":
     args = parse_args()
+
+    if args.a is True:
+        apply_theme()
+
     num_clusters = args.c
     num_results = args.n
 
@@ -232,8 +270,9 @@ if __name__ == '__main__':
     while len(counts) > MAX_BINS:
         bin_size *= 2
         counts, colors = colors_to_bins(counts, colors, bin_size)
-    palette, importances = compute_image_palette(colors, counts, args.c,
-                                                 method='k++_pdf')
+    palette, importances = compute_image_palette(
+        colors, counts, args.c, method="k++_pdf"
+    )
     themes, scores, names = pick_best_themes(palette, importances, num_results)
 
     if args.p is True:
