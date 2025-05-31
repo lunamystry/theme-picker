@@ -6,7 +6,7 @@
 # ///
 #
 
-from argparse import ArgumentParser
+import click
 from PIL import Image
 import os
 import subprocess
@@ -29,8 +29,8 @@ def calculate_importances(populations, colors):
 
 
 # Loads an image and extracts colors and their frequencies from an image
-def get_image_colors(args):
-    with Image.open(args.image_path).convert("RGB") as im:
+def get_image_colors(image_path):
+    with Image.open(image_path).convert("RGB") as im:
         tally = Counter(im.getdata())
 
     counts = list(tally.values())
@@ -134,37 +134,6 @@ def print_palettes(palette, themes):
     im.show()
 
 
-def parse_args():
-    parser = ArgumentParser(
-        description="Tries to pick the best color palette for a given image \
-                    from a set of hand-picked syntax-highlighting palettes."
-    )
-    parser.add_argument("-n", type=int, default=10, help="number of themes to print")
-    parser.add_argument(
-        "-c", type=int, default=10, help="number of dominating colors in image"
-    )
-    parser.add_argument(
-        "-p",
-        action="store_true",
-        help="print image palette (first column) \
-                                and n best themes in feh",
-    )
-    parser.add_argument(
-        "-a",
-        action="store_true",
-        help="Apply the current theme",
-    )
-    parser.add_argument(
-        "-i",
-        action="store_true",
-        help="call interactive menu to install one of the \
-                                suggested themes using wal",
-    )
-    parser.add_argument("image_path", metavar="image_path", type=str)
-    args = parser.parse_args()
-    return args
-
-
 def print_results(names, scores):
     print("    Theme", " " * 32, "Score (lower is better)")
     for ii in range(len(names)):
@@ -207,7 +176,6 @@ def install_theme(names, scores):
     backup_path = save_current_theme()
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    themes_path = dir_path + "/themes/colorschemes/"
     current_theme_path = dir_path + "/current_theme"
 
     while True:
@@ -248,7 +216,16 @@ def colors_to_bins(counts, colors, bin_size):
     return np.array(new_counts), np.array(new_colors)
 
 
-def apply_theme():
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+def apply():
+    """
+    Applies the current theme using wallust
+    """
     dir_path = os.path.dirname(os.path.realpath(__file__))
     current_theme_path = dir_path + "/current_theme"
     with open(current_theme_path) as f:
@@ -256,29 +233,63 @@ def apply_theme():
     subprocess.call(f"wallust theme {theme_name}", shell=True)
 
 
-if __name__ == "__main__":
-    args = parse_args()
-
-    if args.a is True:
-        apply_theme()
-
-    num_clusters = args.c
-    num_results = args.n
-
-    counts, colors = get_image_colors(args)
+@cli.command()
+@click.argument("image_path", type=click.Path(writable=True))
+@click.option(
+    "-c",
+    "--clusters",
+    type=int,
+    default=10,
+    help="number of dominating colors in image",
+)
+@click.option(
+    "-n",
+    "--number_of_themes",
+    type=int,
+    default=10,
+    help="number of themes to print",
+)
+@click.option(
+    "-i",
+    "--install",
+    is_flag=True,
+    help="call interactive menu to install one of the suggested themes using wallust",
+)
+@click.option(
+    "-p",
+    "--print_palettes",
+    is_flag=True,
+    help="print image palette (first column) and n best themes default image viewer",
+)
+def pick(
+    image_path,
+    number_of_clusters,
+    number_of_themes,
+    should_install,
+    should_print_palettes,
+):
+    """
+    Tries to pick the best color palette for a given image from
+    a set of hand-picked syntax-highlighting palettes.
+    """
+    counts, colors = get_image_colors(image_path)
     bin_size = 1
     while len(counts) > MAX_BINS:
         bin_size *= 2
         counts, colors = colors_to_bins(counts, colors, bin_size)
     palette, importances = compute_image_palette(
-        colors, counts, args.c, method="k++_pdf"
+        colors, counts, number_of_clusters, method="k++_pdf"
     )
-    themes, scores, names = pick_best_themes(palette, importances, num_results)
+    themes, scores, names = pick_best_themes(palette, importances, number_of_themes)
 
-    if args.p is True:
+    if should_print_palettes is True:
         print_palettes(palette, themes)
 
-    if args.i is True:
+    if should_install is True:
         install_theme(names, scores)
     else:
         print_results(names, scores)
+
+
+if __name__ == "__main__":
+    cli()
