@@ -247,14 +247,28 @@ def preview(theme_names):
     """
     prints a preview of the theme
     """
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    colourschemes_path = f"{dir_path}/themes/colorschemes/"
+
+    if not theme_names:
+        try:
+            with open(dir_path + "/current_theme") as f:
+                current_theme_name = f.read().strip()
+            theme_names = [current_theme_name]
+        except FileNotFoundError:
+            click.echo("not current theme and no theme names given")
+            return
+
     padding = len(max(theme_names, key=len)) + 1
     for theme_name in theme_names:
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        colourschemes_path = f"{dir_path}/themes/colorschemes/"
         theme_path = f"{colourschemes_path}{theme_name}.json"
 
-        with open(theme_path) as f:
-            data = json.load(f)
+        try:
+            with open(theme_path) as f:
+                data = json.load(f)
+        except FileNotFoundError:
+            click.echo(f"could not find file: {theme_path}")
+            return
 
         click.echo(f"{theme_name}".ljust(padding), nl=False)
         colours = [*data["special"].items(), *util.natural_sort(data["colors"]).items()]
