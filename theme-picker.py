@@ -14,7 +14,11 @@ import json
 import numpy as np
 from collections import Counter
 from kmean import wkmean
+import re
+
 from colordiff import rgb, rgb_dist
+import util
+from util import natural_sort
 
 MAX_FIT_ITERATIONS = 100
 MAX_BINS = 1000
@@ -112,7 +116,6 @@ def pick_best_themes(palette, importances, num_results):
     return sorted_themes, sorted_scores, sorted_names
 
 
-# Prints palette in the first column and themes in columns after using feh
 def print_palettes(palette, themes):
     L = 50
     palettes = (palette,) + tuple(themes)
@@ -216,9 +219,48 @@ def colors_to_bins(counts, colors, bin_size):
     return np.array(new_counts), np.array(new_colors)
 
 
+def abbr(name):
+    if name == "background":
+        return "bg"
+    if name == "foreground":
+        return "fg"
+
+    number_matches = re.findall(r"color(\d+)", name)
+    if number_matches:
+        return f"{name[0]}{number_matches[0]}"
+
+    return f"{name[0]}{name[-1]}"
+
+
+def printc(name, hex):
+    click.echo(click.style(abbr(name).center(5), bg=util.hex_to_rgb(hex)), nl=False)
+
+
 @click.group()
 def cli():
     pass
+
+
+@cli.command()
+@click.argument("theme_names", nargs=-1, type=str)
+def preview(theme_names):
+    """
+    prints a preview of the theme
+    """
+    padding = len(max(theme_names, key=len)) + 1
+    for theme_name in theme_names:
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        colourschemes_path = f"{dir_path}/themes/colorschemes/"
+        theme_path = f"{colourschemes_path}{theme_name}.json"
+
+        with open(theme_path) as f:
+            data = json.load(f)
+
+        click.echo(f"{theme_name}".ljust(padding), nl=False)
+        colours = [*data["special"].items(), *util.natural_sort(data["colors"]).items()]
+        for name, colour in colours:
+            printc(name, colour)
+        click.echo()
 
 
 @cli.command()
@@ -252,18 +294,23 @@ def apply():
 @click.option(
     "-i",
     "--install",
+    "should_install",
     is_flag=True,
     help="call interactive menu to install one of the suggested themes using wallust",
 )
 @click.option(
     "-p",
     "--print_palettes",
+    "should_print_palettes",
+    metavar="print",
     is_flag=True,
     help="print image palette (first column) and n best themes default image viewer",
+    callback=lambda ctx, param, value: value,
+    show_default=True,
 )
 def pick(
     image_path,
-    number_of_clusters,
+    clusters,
     number_of_themes,
     should_install,
     should_print_palettes,
@@ -278,12 +325,13 @@ def pick(
         bin_size *= 2
         counts, colors = colors_to_bins(counts, colors, bin_size)
     palette, importances = compute_image_palette(
-        colors, counts, number_of_clusters, method="k++_pdf"
+        colors, counts, clusters, method="k++_pdf"
     )
     themes, scores, names = pick_best_themes(palette, importances, number_of_themes)
 
     if should_print_palettes is True:
         print_palettes(palette, themes)
+        preview(names)
 
     if should_install is True:
         install_theme(names, scores)
