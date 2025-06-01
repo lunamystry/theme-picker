@@ -261,7 +261,7 @@ def get_themes():
     colourschemes_path = f"{dir_path}/themes/colorschemes/"
     themes = {}
     for theme_filename in os.listdir(colourschemes_path):
-        theme_path = f"{colourschemes_path}/{theme_filename}"
+        theme_path = f"{colourschemes_path}{theme_filename}"
         try:
             with open(theme_path) as f:
                 data = json.load(f)
@@ -269,7 +269,7 @@ def get_themes():
                     *data.get("special", {}).items(),
                     *util.natural_sort(data.get("colors", {})).items(),
                 ]
-                themes[theme_path.replace(".json", "")] = colours
+                themes[theme_filename.replace(".json", "")] = colours
         except FileNotFoundError:
             click.echo(f"could not find file: {theme_path}")
 
@@ -281,10 +281,6 @@ def get_themes():
             themes[name] = map_gogh_theme(theme)
 
     return themes
-
-
-def get_theme(theme_name):
-    return get_themes().get(theme_name, {})
 
 
 @click.group()
@@ -311,7 +307,7 @@ def preview(theme_names):
 
     padding = len(max(theme_names, key=len)) + 1
     for theme_name in theme_names:
-        colours = get_theme(theme_name)
+        colours = get_themes().get(theme_name, {})
         if colours:
             click.echo(f"{theme_name}".ljust(padding), nl=False)
             for name, colour in colours:
