@@ -236,6 +236,57 @@ def printc(name, hex):
     click.echo(click.style(abbr(name).center(5), bg=util.hex_to_rgb(hex)), nl=False)
 
 
+def map_gogh_theme(gogh_theme):
+    special_regex = re.compile(r"^(foreground|background|cursor)$")
+    special = {k: v for k, v in gogh_theme.items() if special_regex.match(k)}
+
+    # string that starts with color_ and has digits
+    colours_regex = re.compile(r"^(color_(\d+))$")
+    # string that is color_ maybe has a 0 and has digits
+    key_pattern = re.compile(r"color_0?(\d+)")
+    colours = {
+        key_pattern.sub(r"color\1", k): v
+        for k, v in gogh_theme.items()
+        if colours_regex.match(k)
+    }
+
+    return [
+        *special.items(),
+        *util.natural_sort(colours).items(),
+    ]
+
+
+def get_themes():
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    colourschemes_path = f"{dir_path}/themes/colorschemes/"
+    themes = {}
+    for theme_filename in os.listdir(colourschemes_path):
+        theme_path = f"{colourschemes_path}/{theme_filename}"
+        try:
+            with open(theme_path) as f:
+                data = json.load(f)
+                colours = [
+                    *data.get("special", {}).items(),
+                    *util.natural_sort(data.get("colors", {})).items(),
+                ]
+                themes[theme_path.replace(".json", "")] = colours
+        except FileNotFoundError:
+            click.echo(f"could not find file: {theme_path}")
+
+    gogh_themes_path = f"{dir_path}/themes/themes.json"
+    with open(gogh_themes_path) as f:
+        gogh_themes = json.load(f)
+        for theme in gogh_themes:
+            name = theme.get("name").replace(" ", "-")
+            themes[name] = map_gogh_theme(theme)
+
+    return themes
+
+
+def get_theme(theme_name):
+    return get_themes().get(theme_name, {})
+
+
 @click.group()
 def cli():
     pass
@@ -248,7 +299,6 @@ def preview(theme_names):
     prints a preview of the theme
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    colourschemes_path = f"{dir_path}/themes/colorschemes/"
 
     if not theme_names:
         try:
@@ -261,20 +311,14 @@ def preview(theme_names):
 
     padding = len(max(theme_names, key=len)) + 1
     for theme_name in theme_names:
-        theme_path = f"{colourschemes_path}{theme_name}.json"
-
-        try:
-            with open(theme_path) as f:
-                data = json.load(f)
-        except FileNotFoundError:
-            click.echo(f"could not find file: {theme_path}")
-            return
-
-        click.echo(f"{theme_name}".ljust(padding), nl=False)
-        colours = [*data["special"].items(), *util.natural_sort(data["colors"]).items()]
-        for name, colour in colours:
-            printc(name, colour)
-        click.echo()
+        colours = get_theme(theme_name)
+        if colours:
+            click.echo(f"{theme_name}".ljust(padding), nl=False)
+            for name, colour in colours:
+                printc(name, colour)
+            click.echo()
+        else:
+            click.echo(f"theme '{theme_name}' not found")
 
 
 @cli.command()
